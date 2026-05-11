@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>봉담초 실시간 점수판 (최종)</title>
-    <!-- Firebase SDK (호환성 버전) -->
+    <title>봉담초 실시간 점수판 (최종 수정본)</title>
+    <!-- [수정] 더 안정적인 Firebase SDK 버전으로 변경 -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
     <style>
@@ -60,38 +60,49 @@
 </footer>
 
 <script>
-    // [사용자 설정값 적용 완료]
+    // [중요] 변수 선언을 코드 가장 상단으로 이동하여 에러 방지
+    const teamNames = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "유치원 행정실 교무실"];
+    const icons = ["⚔️", "🏹", "🔮", "🛡️", "🌿", "🧪", "✨"];
+    const games = ["제기차기", "플라잉디스크", "공 띄우기", "공 굴리기", "파이프라인", "응원 점수", "통합 스코어"];
+    const gameMentions = { "제기차기": "제기에 마법을 걸어보세요!", "플라잉디스크": "정확한 투구!", "공 띄우기": "협동심의 끝판왕!", "공 굴리기": "타이밍이 생명!", "파이프라인": "끊기지 않는 흐름!", "응원 점수": "열정적인 응원!", "통합 스코어": "최종 결과 확인!" };
+
+    // [사용자 설정값 적용]
     const firebaseConfig = {
         apiKey: "AIzaSyD1Hv7lUlS-xOpGT_vQhas4nHlpK42MDzg",
-        authDomain: "bongteacher-15070.firebaseapp.com",
-        databaseURL: "https://bongteacher-15070-default-rtdb.firebaseio.com",
+        authDomain: "://firebaseapp.com",
+        databaseURL: "https://firebaseio.com",
         projectId: "bongteacher-15070",
         storageBucket: "bongteacher-15070.firebasestorage.app",
         messagingSenderId: "141118027536",
         appId: "1:141118027536:web:deb2310805042800229795"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-
-    const teamNames = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "유치원 행정실 교무실"];
-    const icons = ["⚔️", "🏹", "🔮", "🛡️", "🌿", "🧪", "✨"];
-    const games = ["제기차기", "플라잉디스크", "공 띄우기", "공 굴리기", "파이프라인", "응원 점수", "통합 스코어"];
-    const gameMentions = { "제기차기": "제기에 마법을 걸어보세요!", "플라잉디스크": "정확한 투구!", "공 띄우기": "협동심의 끝판왕!", "공 굴리기": "타이밍이 생명!", "파이프라인": "끊기지 않는 흐름!", "응원 점수": "열정적인 응원!", "통합 스코어": "최종 결과 확인!" };
+    // Firebase 초기화 확인 후 실행
+    if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        var database = firebase.database();
+    } else {
+        alert("Firebase 로딩 실패! 인터넷 연결을 확인하세요.");
+    }
 
     let scoreData = {};
     let currentTab = "제기차기";
 
-    database.ref('bongdamData').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            scoreData = data.scoreData || {};
-            currentTab = data.currentTab || "제기차기";
-            updateCheerMode(currentTab);
-            renderTabs();
-            renderGrid();
-        } else { resetDB(); }
-    });
+    // DB 리스너 설정
+    if(database) {
+        database.ref('bongdamData').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                scoreData = data.scoreData || {};
+                currentTab = data.currentTab || "제기차기";
+                updateCheerMode(currentTab);
+                renderTabs();
+                renderGrid();
+            } else {
+                initDB(); // 데이터가 없으면 초기값 생성
+            }
+        });
+    }
 
     function updateCheerMode(game) {
         const body = document.getElementById('mainBody');
@@ -101,17 +112,25 @@
 
     window.updateScore = function(idx, v) {
         if (currentTab === "통합 스코어") return;
+        if (!scoreData[currentTab]) scoreData[currentTab] = new Array(7).fill(0);
         scoreData[currentTab][idx] = Math.max(0, (scoreData[currentTab][idx] || 0) + v);
         database.ref('bongdamData').update({ scoreData: scoreData });
     };
 
-    window.setTab = function(game) { database.ref('bongdamData').update({ currentTab: game }); };
+    window.setTab = function(game) {
+        database.ref('bongdamData').update({ currentTab: game });
+    };
 
-    function resetDB() {
-        if(!confirm("모든 데이터를 초기화할까요?")) return;
+    function initDB() {
         let initData = {};
         games.forEach(g => initData[g] = new Array(7).fill(0));
         database.ref('bongdamData').set({ scoreData: initData, currentTab: "제기차기" });
+    }
+
+    function resetDB() {
+        if(confirm("정말로 모든 데이터를 0점으로 초기화할까요?")) {
+            initDB();
+        }
     }
 
     function renderTabs() {
@@ -119,12 +138,16 @@
     }
 
     function renderGrid() {
-        const grid = document.getElementById('mainGrid'); grid.innerHTML = '';
+        const grid = document.getElementById('mainGrid'); 
+        if(!grid) return;
+        grid.innerHTML = '';
         const isTotal = currentTab === "통합 스코어";
+
         teamNames.forEach((name, i) => {
             let gameTotal = games.filter(g => g !== "통합 스코어" && g !== "응원 점수").reduce((a, b) => a + (scoreData[b]?.[i] || 0), 0);
             let cheer = scoreData["응원 점수"]?.[i] || 0;
             let score = isTotal ? (gameTotal + cheer) : (scoreData[currentTab]?.[i] || 0);
+            
             let winners = [];
             games.filter(g => g !== "통합 스코어" && g !== "응원 점수").forEach(g => { 
                 const sArr = scoreData[g] || new Array(7).fill(0);
@@ -136,9 +159,11 @@
             card.innerHTML = `<div class="card-top"><div class="team-icon">${icons[i]}</div><div class="team-name">${name} 소속 교직원</div><div class="team-score">${score}</div></div>${isTotal ? `<div style="font-size:1.8vh; color:#888">경기 ${gameTotal} + 응원 ${cheer}</div><div style="display:flex; flex-wrap:wrap; justify-content:center; gap:3px; margin-top:5px">${winners.map(w => `<span style="font-size:1.4vh; color:#fff; background:var(--accent-blue); padding:3px 8px; border-radius:10px; font-weight:bold">🏅${w}</span>`).join('')}</div>` : `<div class="controls"><button class="btn-m10" onclick="updateScore(${i},-10)">-10</button><button class="btn-p10" onclick="updateScore(${i},10)">+10</button><button class="btn-p50" onclick="updateScore(${i},50)">+50</button></div>`}`;
             grid.appendChild(card);
         });
+
         const rankData = teamNames.map((name, i) => ({ name, s: games.filter(g=>g!=="통합 스코어").reduce((a,b)=>a+(scoreData[b]?.[i] || 0), 0) })).sort((a,b)=>b.s-a.s);
         document.getElementById('totalGroupScore').innerText = rankData.reduce((a,b)=>a+b.s, 0);
         document.getElementById('footerMsg').innerHTML = `<span style="color:var(--accent-yellow)">■ [${currentTab}]</span> ${gameMentions[currentTab]}`;
+        
         const rankCard = document.createElement('div'); rankCard.className = 'card ranking-card';
         rankCard.innerHTML = `<div class="ranking-header">📊 실시간 순위</div><div class="ranking-list">${rankData.map((d,idx)=>`<div class="ranking-row"><span>${idx+1}위. ${d.name}</span><span>${d.s}점</span></div>`).join('')}</div>`;
         grid.appendChild(rankCard);
