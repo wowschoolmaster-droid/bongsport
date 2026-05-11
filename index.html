@@ -2,10 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>봉담초 실시간 점수판 (최종 수정본)</title>
-    <!-- [수정] 더 안정적인 Firebase SDK 버전으로 변경 -->
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
+    <title>봉담초 실시간 점수판 (최종 해결 버전)</title>
     <style>
         :root { --bg-dark: #121212; --card-bg: #222222; --accent-yellow: #ffc107; --accent-blue: #2196f3; --accent-pink: #ff6b81; }
         body { background-color: var(--bg-dark); color: white; font-family: 'Pretendard', sans-serif; margin: 0; padding: 1vh 1vw; height: 100vh; width: 100vw; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; transition: background-color 0.5s ease; }
@@ -24,7 +21,7 @@
         .tabs button.active { background: var(--accent-blue); border-color: var(--accent-blue); }
         body.cheer-mode .tabs button.active { background: var(--accent-pink); border-color: var(--accent-pink); }
         .grid-layout { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 1.5vh; flex: 1; margin-bottom: 1.5vh; }
-        .card { background: var(--card-bg); border-radius: 2vh; border: 3px solid #3d3d3d; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 1.5vh; box-sizing: border-box; }
+        .card { background: var(--card-bg); border-radius: 2vh; border: 3px solid #3d3d3d; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 1.5vh; box-sizing: border-box; transition: border-color 0.5s ease; }
         body.cheer-mode .card { border-color: var(--accent-pink); }
         .card-top { display: flex; flex-direction: column; align-items: center; width: 100%; overflow: hidden; }
         .team-icon { font-size: 4.5vh; margin-bottom: 0.5vh; }
@@ -34,19 +31,24 @@
         .controls { display: flex; gap: 0.4vw; width: 100%; margin-top: auto; }
         .controls button { flex: 1; border: none; padding: 1.2vh 0; border-radius: 0.5vh; font-weight: 900; cursor: pointer; color: white; font-size: 1.8vh; box-shadow: 0 3px 0 #000; }
         .btn-m10 { background: #444; } .btn-p10 { background: var(--accent-blue); } body.cheer-mode .btn-p10 { background: var(--accent-pink); } .btn-p50 { background: var(--accent-yellow); color: black; }
-        .ranking-card { background: #0a0a0a; border: 3px solid var(--accent-blue); align-items: stretch; padding: 1.5vh; }
+        .ranking-card { background: #0a0a0a; border: 3px solid var(--accent-blue); align-items: stretch; padding: 1.5vh; transition: border-color 0.5s ease; }
         body.cheer-mode .ranking-card { border-color: var(--accent-pink); }
         .ranking-header { font-size: 2.5vh; color: var(--accent-blue); margin-bottom: 1vh; font-weight: 900; text-align: center; }
         body.cheer-mode .ranking-header { color: var(--accent-pink); }
         .ranking-list { font-size: 1.8vh; border-top: 2px solid #333; height: 100%; display: flex; flex-direction: column; justify-content: space-around; }
         .ranking-row { display: flex; justify-content: space-between; padding: 0.4vh 0; border-bottom: 1px solid #222; font-weight: bold; }
-        footer { height: 7vh; border-top: 3px solid var(--accent-yellow); padding: 0 2vw; display: flex; justify-content: space-between; align-items: center; background: black; }
+        footer { height: 7vh; border-top: 3px solid var(--accent-yellow); padding: 0 2vw; display: flex; justify-content: space-between; align-items: center; background: black; transition: border-color 0.5s ease; }
         body.cheer-mode footer { border-top-color: var(--accent-pink); }
         .quest-area { font-size: 2.2vh; font-weight: bold; }
         .sys-btn { padding: 0.4vh 0.8vw; font-size: 1.3vh; cursor: pointer; background: #333; color: #ccc; border: 1px solid #555; border-radius: 4px; }
     </style>
 </head>
 <body id="mainBody">
+
+<!-- 데이터 로딩 화면 -->
+<div id="loadingLayer" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:9999;">
+    <h2 id="loadingMsg">데이터베이스에 연결 중입니다...</h2>
+</div>
 
 <div class="top-bar">
     <div class="snack-area"><span>🍗 간식 타임</span><div class="progress-bar"><div id="snackProgress" class="progress-inner"></div><div class="chicken-icon">🍗</div></div></div>
@@ -59,14 +61,20 @@
     <div><button class="sys-btn" onclick="resetDB()">데이터 리셋</button></div>
 </footer>
 
+<!-- [수정] 차단 가능성이 적은 대체 CDN(cdnjs) 사용 -->
+<script src="https://cloudflare.com"></script>
+<script src="https://cloudflare.com"></script>
+
 <script>
-    // [중요] 변수 선언을 코드 가장 상단으로 이동하여 에러 방지
     const teamNames = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "유치원 행정실 교무실"];
     const icons = ["⚔️", "🏹", "🔮", "🛡️", "🌿", "🧪", "✨"];
     const games = ["제기차기", "플라잉디스크", "공 띄우기", "공 굴리기", "파이프라인", "응원 점수", "통합 스코어"];
     const gameMentions = { "제기차기": "제기에 마법을 걸어보세요!", "플라잉디스크": "정확한 투구!", "공 띄우기": "협동심의 끝판왕!", "공 굴리기": "타이밍이 생명!", "파이프라인": "끊기지 않는 흐름!", "응원 점수": "열정적인 응원!", "통합 스코어": "최종 결과 확인!" };
+    
+    let scoreData = {};
+    let currentTab = "제기차기";
+    let database;
 
-    // [사용자 설정값 적용]
     const firebaseConfig = {
         apiKey: "AIzaSyD1Hv7lUlS-xOpGT_vQhas4nHlpK42MDzg",
         authDomain: "://firebaseapp.com",
@@ -77,61 +85,57 @@
         appId: "1:141118027536:web:deb2310805042800229795"
     };
 
-    // Firebase 초기화 확인 후 실행
-    if (typeof firebase !== 'undefined') {
-        firebase.initializeApp(firebaseConfig);
-        var database = firebase.database();
-    } else {
-        alert("Firebase 로딩 실패! 인터넷 연결을 확인하세요.");
+    function connectFirebase() {
+        if (typeof firebase !== 'undefined') {
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            
+            database.ref('bongdamData').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    document.getElementById('loadingLayer').style.display = 'none';
+                    scoreData = data.scoreData || {};
+                    currentTab = data.currentTab || "제기차기";
+                    renderAll();
+                } else {
+                    document.getElementById('loadingMsg').innerText = "데이터가 비어 있습니다. [데이터 리셋] 버튼을 누르세요.";
+                    document.getElementById('loadingLayer').style.display = 'none';
+                }
+            }, (error) => {
+                alert("Firebase 연결 오류: " + error.message);
+            });
+        } else {
+            // 라이브러리 로딩이 늦어지면 0.5초 뒤에 다시 확인
+            setTimeout(connectFirebase, 500);
+        }
     }
 
-    let scoreData = {};
-    let currentTab = "제기차기";
-
-    // DB 리스너 설정
-    if(database) {
-        database.ref('bongdamData').on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                scoreData = data.scoreData || {};
-                currentTab = data.currentTab || "제기차기";
-                updateCheerMode(currentTab);
-                renderTabs();
-                renderGrid();
-            } else {
-                initDB(); // 데이터가 없으면 초기값 생성
-            }
-        });
-    }
-
-    function updateCheerMode(game) {
+    function renderAll() {
         const body = document.getElementById('mainBody');
-        if(game === "응원 점수") body.classList.add('cheer-mode');
+        if(currentTab === "응원 점수") body.classList.add('cheer-mode');
         else body.classList.remove('cheer-mode');
+        renderTabs();
+        renderGrid();
     }
 
     window.updateScore = function(idx, v) {
-        if (currentTab === "통합 스코어") return;
+        if (currentTab === "통합 스코어" || !database) return;
         if (!scoreData[currentTab]) scoreData[currentTab] = new Array(7).fill(0);
         scoreData[currentTab][idx] = Math.max(0, (scoreData[currentTab][idx] || 0) + v);
         database.ref('bongdamData').update({ scoreData: scoreData });
     };
 
     window.setTab = function(game) {
+        if(!database) return;
         database.ref('bongdamData').update({ currentTab: game });
     };
 
-    function initDB() {
+    window.resetDB = function() {
+        if(!confirm("모든 데이터를 초기화할까요?") || !database) return;
         let initData = {};
         games.forEach(g => initData[g] = new Array(7).fill(0));
         database.ref('bongdamData').set({ scoreData: initData, currentTab: "제기차기" });
-    }
-
-    function resetDB() {
-        if(confirm("정말로 모든 데이터를 0점으로 초기화할까요?")) {
-            initDB();
-        }
-    }
+    };
 
     function renderTabs() {
         document.getElementById('tabGroup').innerHTML = games.map(g => `<button class="${g===currentTab?'active':''}" onclick="setTab('${g}')">${g}</button>`).join('');
@@ -163,11 +167,13 @@
         const rankData = teamNames.map((name, i) => ({ name, s: games.filter(g=>g!=="통합 스코어").reduce((a,b)=>a+(scoreData[b]?.[i] || 0), 0) })).sort((a,b)=>b.s-a.s);
         document.getElementById('totalGroupScore').innerText = rankData.reduce((a,b)=>a+b.s, 0);
         document.getElementById('footerMsg').innerHTML = `<span style="color:var(--accent-yellow)">■ [${currentTab}]</span> ${gameMentions[currentTab]}`;
-        
         const rankCard = document.createElement('div'); rankCard.className = 'card ranking-card';
         rankCard.innerHTML = `<div class="ranking-header">📊 실시간 순위</div><div class="ranking-list">${rankData.map((d,idx)=>`<div class="ranking-row"><span>${idx+1}위. ${d.name}</span><span>${d.s}점</span></div>`).join('')}</div>`;
         grid.appendChild(rankCard);
     }
+
+    // 문서 로드 후 실행
+    window.onload = connectFirebase;
 </script>
 </body>
 </html>
