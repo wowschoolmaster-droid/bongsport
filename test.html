@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase 연결 테스트</title>
+    <!-- Firebase 라이브러리 -->
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+</head>
+<body style="background: #000; color: #fff; text-align: center; padding-top: 50px; font-family: sans-serif;">
+
+    <h1>📡 실시간 연결 테스트</h1>
+    
+    <div style="margin: 30px; padding: 20px; border: 2px solid #555;">
+        <h3>현재 서버 상태: <span id="status" style="color: #ff4444;">연결 대기 중...</span></h3>
+        <h2>서버 데이터: <span id="db-data" style="color: #ffc107;">없음</span></h2>
+    </div>
+
+    <button onclick="sendTestData()" style="padding: 20px 40px; font-size: 20px; cursor: pointer;">
+        🚀 테스트 데이터 전송 (클릭!)
+    </button>
+
+    <p style="margin-top: 50px; color: #888;">
+        버튼을 누르면 현재 시간이 서버로 전송됩니다.<br>
+        스마트폰에서 눌렀을 때 노트북 화면의 숫자가 바뀌면 성공입니다!
+    </p>
+
+    <script>
+        // 사용자님의 실제 설정값
+        const firebaseConfig = {
+            apiKey: "AIzaSyD1Hv7lUlS-xOpGT_vQhas4nHlpK42MDzg",
+            authDomain: "://firebaseapp.com",
+            databaseURL: "https://firebaseio.com",
+            projectId: "bongteacher-15070",
+            storageBucket: "bongteacher-15070.firebasestorage.app",
+            messagingSenderId: "141118027536",
+            appId: "1:141118027536:web:deb2310805042800229795"
+        };
+
+        // 1. 초기화
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 2. 실시간 감시 (서버 데이터가 바뀌면 자동으로 실행됨)
+        database.ref('test-connection').on('value', (snapshot) => {
+            const data = snapshot.val();
+            document.getElementById('status').innerText = "연결 성공! ✅";
+            document.getElementById('status').style.color = "#00ff00";
+            document.getElementById('db-data').innerText = data ? data : "데이터 기다리는 중...";
+            console.log("수신된 데이터:", data);
+        }, (error) => {
+            document.getElementById('status').innerText = "연결 오류 ❌";
+            alert("오류 원인: " + error.message);
+        });
+
+        // 3. 데이터 전송 (버튼 클릭 시 실행)
+        function sendTestData() {
+            const now = new Date().toLocaleTimeString();
+            database.ref('test-connection').set(now)
+            .then(() => console.log("전송 완료!"))
+            .catch(err => alert("전송 실패: " + err.message));
+        }
+    </script>
+</body>
+</html>
