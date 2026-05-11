@@ -2,74 +2,82 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>봉담초 Firebase 최종 테스트</title>
-    <!-- Firebase 라이브러리 (안정적인 버전 8) -->
+    <title>봉담초 실시간 연결 끝장판</title>
+    <!-- [수정] 가장 안정적인 소스 3개를 순차적으로 배치 -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 </head>
-<body style="background: #121212; color: #fff; text-align: center; padding-top: 50px; font-family: sans-serif;">
+<body style="background: #000; color: #fff; text-align: center; padding-top: 50px; font-family: sans-serif;">
 
-    <h1>📡 Firebase 실시간 연결 테스트</h1>
+    <h1>📡 실시간 연결 끝장 테스트</h1>
     
-    <div style="margin: 30px auto; padding: 20px; border: 2px solid #333; max-width: 500px; border-radius: 15px;">
-        <h3 id="status" style="color: #ffc107;">데이터베이스 연결 시도 중...</h3>
+    <div style="margin: 30px auto; padding: 20px; border: 2px solid #555; max-width: 400px; border-radius: 15px;">
+        <h3 id="lib-status" style="color: #ff4444;">라이브러리 로드 대기 중...</h3>
+        <h3 id="db-status" style="color: #888;">DB 연결 대기 중...</h3>
         <hr style="border: 0.5px solid #333;">
-        <p>서버에 기록된 시간:</p>
+        <p>서버 수신 시간:</p>
         <h2 id="db-data" style="color: #00ff00;">- - : - - : - -</h2>
     </div>
 
-    <button onclick="sendTime()" style="padding: 20px 40px; font-size: 20px; cursor: pointer; background: #2196f3; color: white; border: none; border-radius: 10px; font-weight: bold;">
-        🚀 내 폰의 현재 시간 전송하기
+    <button id="sendBtn" onclick="sendTime()" disabled style="padding: 20px 40px; font-size: 20px; cursor: not-allowed; background: #555; color: white; border: none; border-radius: 10px;">
+        연결 대기 중...
     </button>
 
-    <div id="error-log" style="margin-top: 30px; color: #ff4444; font-size: 14px;"></div>
-
     <script>
-        // 1. 사용자님이 제공해주신 실제 설정값 (미국 서버 주소 반영)
         const firebaseConfig = {
             apiKey: "AIzaSyD1Hv7lUlS-xOpGT_vQhas4nHlpK42MDzg",
             authDomain: "://firebaseapp.com",
-            databaseURL: "https://bongteacher-15070-default-rtdb.firebaseio.com", // 주소 업데이트 완료
+            databaseURL: "https://firebaseio.com",
             projectId: "bongteacher-15070",
             storageBucket: "bongteacher-15070.firebasestorage.app",
             messagingSenderId: "141118027536",
             appId: "1:141118027536:web:deb2310805042800229795"
         };
 
-        // 2. Firebase 초기화
-        try {
-            firebase.initializeApp(firebaseConfig);
-            const database = firebase.database();
-            const statusEl = document.getElementById('status');
-            const dataEl = document.getElementById('db-data');
-
-            // 3. 데이터 감시 (연결 성공 시 자동 실행)
-            database.ref('test-signal').on('value', (snapshot) => {
-                const data = snapshot.val();
-                statusEl.innerText = "연결 성공! ✅ (실시간 작동 중)";
-                statusEl.style.color = "#00ff00";
-                dataEl.innerText = data ? data : "버튼을 눌러보세요!";
-            }, (error) => {
-                statusEl.innerText = "접근 거부됨 ❌ (규칙 확인 필요)";
-                statusEl.style.color = "#ff4444";
-                document.getElementById('error-log').innerText = "에러 사유: " + error.message;
-            });
-
-            // 4. 데이터 전송 함수
-            window.sendTime = function() {
-                const now = new Date().toLocaleTimeString();
-                database.ref('test-signal').set(now)
-                .then(() => console.log("전송 성공: " + now))
-                .catch(err => {
-                    alert("전송 실패! 규칙 설정을 확인하세요.");
-                    console.error(err);
-                });
-            };
-
-        } catch (e) {
-            document.getElementById('status').innerText = "초기화 오류! ❌";
-            document.getElementById('error-log').innerText = e.message;
+        // [핵심] 파이어베이스가 로드될 때까지 무한 반복 체크
+        function checkFirebase() {
+            if (typeof firebase !== 'undefined') {
+                console.log("Firebase 로드 성공!");
+                document.getElementById('lib-status').innerText = "라이브러리 준비 완료! ✅";
+                document.getElementById('lib-status').style.color = "#00ff00";
+                startSystem();
+            } else {
+                console.log("Firebase 기다리는 중...");
+                setTimeout(checkFirebase, 500); // 0.5초마다 재확인
+            }
         }
+
+        function startSystem() {
+            try {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                const database = firebase.database();
+                
+                // 데이터 수신 리스너
+                database.ref('test-final-call').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    document.getElementById('db-status').innerText = "DB 실시간 연결 성공! 📡";
+                    document.getElementById('db-status').style.color = "#00ff00";
+                    document.getElementById('db-data').innerText = data ? data : "버튼을 누르세요!";
+                    
+                    // 버튼 활성화
+                    const btn = document.getElementById('sendBtn');
+                    btn.disabled = false;
+                    btn.innerText = "🚀 현재 시간 전송";
+                    btn.style.background = "#2196f3";
+                    btn.style.cursor = "pointer";
+                });
+
+                window.sendTime = function() {
+                    const now = new Date().toLocaleTimeString();
+                    database.ref('test-final-call').set(now);
+                };
+            } catch (e) {
+                document.getElementById('db-status').innerText = "DB 초기화 실패: " + e.message;
+            }
+        }
+
+        // 페이지 열리자마자 체크 시작
+        checkFirebase();
     </script>
 </body>
 </html>
