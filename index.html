@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>봉담초 실시간 점수판 (최종)</title>
+    <!-- Firebase SDK (호환성 버전) -->
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+    <style>
+        :root { --bg-dark: #121212; --card-bg: #222222; --accent-yellow: #ffc107; --accent-blue: #2196f3; --accent-pink: #ff6b81; }
+        body { background-color: var(--bg-dark); color: white; font-family: 'Pretendard', sans-serif; margin: 0; padding: 1vh 1vw; height: 100vh; width: 100vw; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; transition: background-color 0.5s ease; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; height: 8vh; padding: 0 2vw; margin-bottom: 1vh; }
+        .snack-area { display: flex; align-items: center; gap: 1vw; font-size: 2.5vh; font-weight: 800; margin-left: 8.5vw; }
+        .progress-bar { width: 14vw; height: 3.5vh; background: #333; border-radius: 2vh; border: 3px solid #ff4444; position: relative; overflow: visible; }
+        .progress-inner { height: 100%; background: linear-gradient(90deg, #ff4444, #ff8888); border-radius: 2vh; width: 100%; transition: width 1s linear; }
+        .chicken-icon { position: absolute; right: -10px; top: -1.5vh; font-size: 4vh; animation: bounce 0.5s infinite alternate; }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+        .total-score-area { font-size: 2.5vh; font-weight: 800; margin-right: 8.5vw; }
+        .total-val { color: var(--accent-yellow); font-size: 4.5vh; margin-left: 15px; text-shadow: 2px 2px 4px #000; }
+        header { text-align: center; height: 15vh; display: flex; flex-direction: column; justify-content: center; }
+        .main-title { font-size: 5vh; color: var(--accent-yellow); font-weight: 900; margin-bottom: 1.5vh; text-shadow: 3px 3px 6px #000; }
+        .tabs { display: flex; justify-content: center; gap: 0.6vw; }
+        .tabs button { background: #2a2a2a; border: 2px solid #444; color: white; padding: 1.2vh 2vw; border-radius: 0.8vh; cursor: pointer; font-size: 2.2vh; font-weight: 800; }
+        .tabs button.active { background: var(--accent-blue); border-color: var(--accent-blue); }
+        body.cheer-mode .tabs button.active { background: var(--accent-pink); border-color: var(--accent-pink); }
+        .grid-layout { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 1.5vh; flex: 1; margin-bottom: 1.5vh; }
+        .card { background: var(--card-bg); border-radius: 2vh; border: 3px solid #3d3d3d; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 1.5vh; box-sizing: border-box; }
+        body.cheer-mode .card { border-color: var(--accent-pink); }
+        .card-top { display: flex; flex-direction: column; align-items: center; width: 100%; overflow: hidden; }
+        .team-icon { font-size: 4.5vh; margin-bottom: 0.5vh; }
+        .team-name { font-size: 1.5vw; color: #fff; font-weight: 900; text-align: center; height: 6vh; display: flex; align-items: center; justify-content: center; white-space: nowrap; letter-spacing: -0.05vw; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); width: 100%; }
+        .team-score { font-size: 8.5vh; font-weight: 900; color: var(--accent-yellow); line-height: 1; margin: 0.5vh 0; text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 4px 4px 10px rgba(0,0,0,1); }
+        body.cheer-mode .team-score { color: var(--accent-pink); }
+        .controls { display: flex; gap: 0.4vw; width: 100%; margin-top: auto; }
+        .controls button { flex: 1; border: none; padding: 1.2vh 0; border-radius: 0.5vh; font-weight: 900; cursor: pointer; color: white; font-size: 1.8vh; box-shadow: 0 3px 0 #000; }
+        .btn-m10 { background: #444; } .btn-p10 { background: var(--accent-blue); } body.cheer-mode .btn-p10 { background: var(--accent-pink); } .btn-p50 { background: var(--accent-yellow); color: black; }
+        .ranking-card { background: #0a0a0a; border: 3px solid var(--accent-blue); align-items: stretch; padding: 1.5vh; }
+        body.cheer-mode .ranking-card { border-color: var(--accent-pink); }
+        .ranking-header { font-size: 2.5vh; color: var(--accent-blue); margin-bottom: 1vh; font-weight: 900; text-align: center; }
+        body.cheer-mode .ranking-header { color: var(--accent-pink); }
+        .ranking-list { font-size: 1.8vh; border-top: 2px solid #333; height: 100%; display: flex; flex-direction: column; justify-content: space-around; }
+        .ranking-row { display: flex; justify-content: space-between; padding: 0.4vh 0; border-bottom: 1px solid #222; font-weight: bold; }
+        footer { height: 7vh; border-top: 3px solid var(--accent-yellow); padding: 0 2vw; display: flex; justify-content: space-between; align-items: center; background: black; }
+        body.cheer-mode footer { border-top-color: var(--accent-pink); }
+        .quest-area { font-size: 2.2vh; font-weight: bold; }
+        .sys-btn { padding: 0.4vh 0.8vw; font-size: 1.3vh; cursor: pointer; background: #333; color: #ccc; border: 1px solid #555; border-radius: 4px; }
+    </style>
+</head>
+<body id="mainBody">
+
+<div class="top-bar">
+    <div class="snack-area"><span>🍗 간식 타임</span><div class="progress-bar"><div id="snackProgress" class="progress-inner"></div><div class="chicken-icon">🍗</div></div></div>
+    <div class="total-score-area">봉담초 전체 단합점수: <span id="totalGroupScore" class="total-val">0</span></div>
+</div>
+<header><div class="main-title">봉담초 스승의 날 체육연수 : 단합의 장</div><div class="tabs" id="tabGroup"></div></header>
+<div class="grid-layout" id="mainGrid"></div>
+<footer>
+    <div class="quest-area" id="footerMsg"></div>
+    <div><button class="sys-btn" onclick="resetDB()">데이터 리셋</button></div>
+</footer>
+
+<script>
+    // [사용자 설정값 적용 완료]
+    const firebaseConfig = {
+        apiKey: "AIzaSyD1Hv7lUlS-xOpGT_vQhas4nHlpK42MDzg",
+        authDomain: "bongteacher-15070.firebaseapp.com",
+        databaseURL: "https://bongteacher-15070-default-rtdb.firebaseio.com",
+        projectId: "bongteacher-15070",
+        storageBucket: "bongteacher-15070.firebasestorage.app",
+        messagingSenderId: "141118027536",
+        appId: "1:141118027536:web:deb2310805042800229795"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    const teamNames = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "유치원 행정실 교무실"];
+    const icons = ["⚔️", "🏹", "🔮", "🛡️", "🌿", "🧪", "✨"];
+    const games = ["제기차기", "플라잉디스크", "공 띄우기", "공 굴리기", "파이프라인", "응원 점수", "통합 스코어"];
+    const gameMentions = { "제기차기": "제기에 마법을 걸어보세요!", "플라잉디스크": "정확한 투구!", "공 띄우기": "협동심의 끝판왕!", "공 굴리기": "타이밍이 생명!", "파이프라인": "끊기지 않는 흐름!", "응원 점수": "열정적인 응원!", "통합 스코어": "최종 결과 확인!" };
+
+    let scoreData = {};
+    let currentTab = "제기차기";
+
+    database.ref('bongdamData').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            scoreData = data.scoreData || {};
+            currentTab = data.currentTab || "제기차기";
+            updateCheerMode(currentTab);
+            renderTabs();
+            renderGrid();
+        } else { resetDB(); }
+    });
+
+    function updateCheerMode(game) {
+        const body = document.getElementById('mainBody');
+        if(game === "응원 점수") body.classList.add('cheer-mode');
+        else body.classList.remove('cheer-mode');
+    }
+
+    window.updateScore = function(idx, v) {
+        if (currentTab === "통합 스코어") return;
+        scoreData[currentTab][idx] = Math.max(0, (scoreData[currentTab][idx] || 0) + v);
+        database.ref('bongdamData').update({ scoreData: scoreData });
+    };
+
+    window.setTab = function(game) { database.ref('bongdamData').update({ currentTab: game }); };
+
+    function resetDB() {
+        if(!confirm("모든 데이터를 초기화할까요?")) return;
+        let initData = {};
+        games.forEach(g => initData[g] = new Array(7).fill(0));
+        database.ref('bongdamData').set({ scoreData: initData, currentTab: "제기차기" });
+    }
+
+    function renderTabs() {
+        document.getElementById('tabGroup').innerHTML = games.map(g => `<button class="${g===currentTab?'active':''}" onclick="setTab('${g}')">${g}</button>`).join('');
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('mainGrid'); grid.innerHTML = '';
+        const isTotal = currentTab === "통합 스코어";
+        teamNames.forEach((name, i) => {
+            let gameTotal = games.filter(g => g !== "통합 스코어" && g !== "응원 점수").reduce((a, b) => a + (scoreData[b]?.[i] || 0), 0);
+            let cheer = scoreData["응원 점수"]?.[i] || 0;
+            let score = isTotal ? (gameTotal + cheer) : (scoreData[currentTab]?.[i] || 0);
+            let winners = [];
+            games.filter(g => g !== "통합 스코어" && g !== "응원 점수").forEach(g => { 
+                const sArr = scoreData[g] || new Array(7).fill(0);
+                const max = Math.max(...sArr);
+                if (max > 0 && sArr[i] === max) winners.push(g); 
+            });
+
+            const card = document.createElement('div'); card.className = 'card';
+            card.innerHTML = `<div class="card-top"><div class="team-icon">${icons[i]}</div><div class="team-name">${name} 소속 교직원</div><div class="team-score">${score}</div></div>${isTotal ? `<div style="font-size:1.8vh; color:#888">경기 ${gameTotal} + 응원 ${cheer}</div><div style="display:flex; flex-wrap:wrap; justify-content:center; gap:3px; margin-top:5px">${winners.map(w => `<span style="font-size:1.4vh; color:#fff; background:var(--accent-blue); padding:3px 8px; border-radius:10px; font-weight:bold">🏅${w}</span>`).join('')}</div>` : `<div class="controls"><button class="btn-m10" onclick="updateScore(${i},-10)">-10</button><button class="btn-p10" onclick="updateScore(${i},10)">+10</button><button class="btn-p50" onclick="updateScore(${i},50)">+50</button></div>`}`;
+            grid.appendChild(card);
+        });
+        const rankData = teamNames.map((name, i) => ({ name, s: games.filter(g=>g!=="통합 스코어").reduce((a,b)=>a+(scoreData[b]?.[i] || 0), 0) })).sort((a,b)=>b.s-a.s);
+        document.getElementById('totalGroupScore').innerText = rankData.reduce((a,b)=>a+b.s, 0);
+        document.getElementById('footerMsg').innerHTML = `<span style="color:var(--accent-yellow)">■ [${currentTab}]</span> ${gameMentions[currentTab]}`;
+        const rankCard = document.createElement('div'); rankCard.className = 'card ranking-card';
+        rankCard.innerHTML = `<div class="ranking-header">📊 실시간 순위</div><div class="ranking-list">${rankData.map((d,idx)=>`<div class="ranking-row"><span>${idx+1}위. ${d.name}</span><span>${d.s}점</span></div>`).join('')}</div>`;
+        grid.appendChild(rankCard);
+    }
+</script>
+</body>
+</html>
